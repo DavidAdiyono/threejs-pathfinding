@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Selection Page</title>
+</head>
+
+<script type="text/javascript" src="w3.js"></script>
+<script type="text/javascript" src="location.js"></script>
+
+<body>
+
+<h1>Testing W3.JS in HTML</h1></br>
+
+<h2>Current Location :</h2></br>
+<select id="id01">
+  <option w3-repeat="location">{{locname}} : {{info}}</option>
+</select></br>
+
+<h2>Destination :</h2></br>
+<select id="id02">
+  <option w3-repeat="location">{{locname}} : {{info}}</option>
+</select></br></br>
+
+<script>
+w3.displayObject("id01", Loc);
+w3.displayObject("id02", Loc);
+localStorage.setItem("storage1", undefined);
+localStorage.setItem("storage2", undefined);
+
+function passvar() {
+   var getInput1 = JSON.stringify(Loc.location[document.getElementById("id01").selectedIndex]);
+   localStorage.setItem("storage1", getInput1);
+   var getInput2 = JSON.stringify(Loc.location[document.getElementById("id02").selectedIndex]);
+   localStorage.setItem("storage2", getInput2);
+   }
+</script>
+
+<a href="main.html"><input id="button" type="button" value="Pass param" onclick="passvar();" /></a>
+</body>
+
+</html>

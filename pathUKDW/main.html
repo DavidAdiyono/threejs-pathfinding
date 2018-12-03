@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three-pathfinding UKDW</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	</head>
+
+	<style>
+    body {
+      font-family: Helvetica, sans-serify;
+      background-color: #000;
+      color: #fff;
+      margin: 0px;
+      overflow: hidden;
+    }
+
+    .info {
+      padding: 1em;
+      width: 100%;
+      position: absolute;
+      background-color: rgba(0, 0, 0, 0.8);
+      font-size: 14px;
+    }
+
+    .info p {
+      padding: 0;
+      margin: 0;
+    }
+	</style>
+
+	<body>
+
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r71/three.js"></script>
+		<script src="OrbitControls.js"></script>
+		<script src="three-pathfinding.umd.js"></script>
+		
+		<div class="info">
+			<p>Tekan refresh pada browser untuk mengulang pencarian jalan, atau back pada browser untuk kembali ke menu pencarian.</p>
+		</div>
+		
+		<script>
+
+			/* global threePathfinding */
+			THREE.Pathfinding = threePathfinding.Pathfinding;
+			var pathfinder = new THREE.Pathfinding();
+
+			var container;
+
+			var camera, scene, renderer, controls;
+
+			var raycaster, intersectedObject;
+
+			var mouse = new THREE.Vector2();
+
+			var startTime	= Date.now();
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+
+			var lastFrameTime = 0;
+			var maxFrameTime = 0.03;
+			var elapsedTime = 0;
+
+			var level;
+
+			init();
+			animate();
+
+			var player, target;
+
+			var playerNavMeshGroup;
+
+			var calculatedPath = null;
+
+			var pathLines;
+
+			function init() {
+				item1 = JSON.parse(localStorage.getItem("storage1"));
+				item2 = JSON.parse(localStorage.getItem("storage2"));
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 2000 );
+				camera.position.x = -10;
+				camera.position.y = 14;
+				camera.position.z = 30;
+
+				scene = new THREE.Scene();
+
+				var ambient = new THREE.AmbientLight( 0x101030 );
+				scene.add( ambient );
+
+		        // Add player sphere
+				var geometry = new THREE.SphereGeometry( 0.25, 32, 32 );
+				var material = new THREE.MeshBasicMaterial( {color: 0xff0000} );
+				player = new THREE.Mesh( geometry, material );
+				scene.add( player );
+
+				// Add goal marker
+				geometry = new THREE.BoxGeometry( 0.3, 0.3, 0.3 );
+				var material = new THREE.MeshBasicMaterial( {color: 0xff0000} );
+				target = new THREE.Mesh( geometry, material );
+				scene.add( target );
+
+				target.position.copy(player.position);
+
+				renderer = new THREE.WebGLRenderer();
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.setClearColor(0xffffff);
+				container.appendChild( renderer.domElement );
+
+				controls = new THREE.OrbitControls( camera );
+				controls.damping = 0.2;
+
+				window.addEventListener( 'resize', onWindowResize, false );
+
+  				var jsonLoader = new THREE.JSONLoader();
+
+				// Load objects
+		        jsonLoader.load( 'meshes/lt1.json', function( geometry, materials ) {
+		        	level = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+		        		color: 0x003300,
+		        		opacity: 0.5,
+						side: THREE.DoubleSide,
+		        		transparent: true
+		        	}));
+		        	scene.add(level);
+		        }, null);
+
+		        jsonLoader.load( 'meshes/lt2.json', function( geometry, materials ) {
+		        	level2 = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+		        		color: 0x006600,
+		        		opacity: 0.5,
+						side: THREE.DoubleSide,
+		        		transparent: true
+		        	}));
+		        	scene.add(level2);
+		        }, null);
+				
+				jsonLoader.load( 'meshes/lt3.json', function( geometry, materials ) {
+		        	level3 = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+		        		color: 0x009900,
+		        		opacity: 0.5,
+						side: THREE.DoubleSide,
+		        		transparent: true
+		        	}));
+		        	scene.add(level3);
+		        }, null);
+
+				jsonLoader.load( 'meshes/lt4.json', function( geometry, materials ) {
+		        	level4 = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+		        		color: 0x00cc00,
+		        		opacity: 0.5,
+						side: THREE.DoubleSide,
+		        		transparent: true
+		        	}));
+		        	scene.add(level4);
+		        }, null);
+
+				jsonLoader.load( 'meshes/lt5.json', function( geometry, materials ) {
+		        	level5 = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+		        		color: 0x00ff00,
+		        		opacity: 0.5,
+						side: THREE.DoubleSide,
+		        		transparent: true
+		        	}));
+		        	scene.add(level5);
+		        }, null);
+				
+				jsonLoader.load( 'meshes/lta.json', function( geometry, materials ) {
+		        	levela = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+		        		color: 0x66ff66,
+		        		opacity: 0.5,
+						side: THREE.DoubleSide,
+		        		transparent: true
+		        	}));
+		        	scene.add(levela);
+		        }, null);
+				
+				//Load Navmesh
+		        jsonLoader.load( 'meshes/nav.json', function( geometry, materials ) {
+					var zoneNodes = THREE.Pathfinding.createZone(geometry);
+					pathfinder.setZoneData('level', zoneNodes);
+
+		        	playerNavMeshGroup = pathfinder.getGroup('level', player.position);
+    				walkPath();
+
+		        }, null);
+				
+			}
+			
+			function walkPath() {
+					// Calculate a path to the target and store it
+						if (pathLines) {
+							scene.remove(pathLines);
+						}
+
+					player.position.set(parseFloat(item1.coorx), parseFloat(item1.coory), parseFloat(item1.coorz));
+					target.position.set(parseFloat(item2.coorx), parseFloat(item2.coory), parseFloat(item2.coorz));
+					calculatedPath = pathfinder.findPath(player.position, target.position, 'level', 0);
+
+					if (calculatedPath && calculatedPath.length) {
+
+						if (pathLines) {
+							scene.remove(pathLines);
+						}
+
+						var material = new THREE.LineBasicMaterial({
+							color: 0x0000ff,
+							linewidth: 2
+						});
+
+						var geometry = new THREE.Geometry();
+						geometry.vertices.push(player.position);
+
+						// Draw debug lines
+						for (var i = 0; i < calculatedPath.length; i++) {
+							geometry.vertices.push(calculatedPath[i].clone().add(new THREE.Vector3(0, 0.3, 0)));
+						}
+
+						pathLines = new THREE.Line( geometry, material );
+						scene.add( pathLines );
+
+						// Draw debug cubes except the last one. Also, add the player position.
+						var debugPath = [player.position].concat(calculatedPath);
+
+						for (var i = 0; i < debugPath.length - 1; i++) {
+							geometry = new THREE.BoxGeometry( 0.3, 0.3, 0.3 );
+							var material = new THREE.MeshBasicMaterial( {color: 0x00ffff} );
+							var node = new THREE.Mesh( geometry, material );
+							node.position.copy(debugPath[i]);
+							pathLines.add( node );
+						}
+					}
+			}
+
+			function onWindowResize() {
+				windowHalfX = window.innerWidth / 2;
+				windowHalfY = window.innerHeight / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+
+			function animate() {
+                var currTime = window.performance.now();
+                var delta = (currTime - lastFrameTime) / 1000;
+                var dTime = Math.min(delta, maxFrameTime);
+                elapsedTime += delta;
+                lastFrameTime = currTime;
+
+                tick(dTime);
+
+				requestAnimationFrame( animate );
+				render();
+			}
+
+			function tick(dTime) {
+				if (!level) {
+					return;
+				}
+
+				var speed = 2.5;
+
+				var targetPosition;
+
+				if (calculatedPath && calculatedPath.length) {
+					targetPosition = calculatedPath[0];
+
+					var vel = targetPosition.clone().sub(player.position);
+
+					if (vel.lengthSq() > 0.05 * 0.05) {
+						vel.normalize();
+
+						// Mve player to target
+						player.position.add(vel.multiplyScalar(dTime * speed));
+					}
+					else {
+						// Remove node from the path we calculated
+						calculatedPath.shift();
+					}
+				}
+			}
+
+			function render() {
+		        camera.lookAt(player.position);
+				camera.updateMatrixWorld();
+
+				renderer.render( scene, camera );
+
+			}
+
+		</script>
+
+	</body>
+</html>
